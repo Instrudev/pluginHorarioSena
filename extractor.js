@@ -19,7 +19,7 @@ function resolveDate(dayElement) {
   }
 
   const knownNodes = dayElement.querySelector(
-    '.date, .day-title, header, h4, h5, .fc-daygrid-day-number'
+    '.date, .day-title, .header a, .header, header, h4, h5, .fc-daygrid-day-number'
   );
   if (knownNodes) {
     return cleanText(knownNodes.textContent);
@@ -92,7 +92,11 @@ function extractActivity(row, text, usedPieces) {
 }
 
 function extractRowsFromDay(dayElement, dateText) {
-  const content = dayElement.querySelector('.content') || dayElement;
+  const content =
+    dayElement.querySelector('.content') ||
+    dayElement.querySelector('.month') ||
+    dayElement;
+
   const rows = Array.from(content.querySelectorAll('tr'));
   const items = [];
 
@@ -130,13 +134,13 @@ function extractRowsFromDay(dayElement, dateText) {
 
 function collectDayNodes() {
   const candidates = Array.from(
-    document.querySelectorAll('td.day > div.day, .schedule-compact-outlookxp .day, .day')
+    document.querySelectorAll('td.day > div.day, td.day, .schedule-compact-outlookxp .day, .day')
   );
 
   const unique = new Map();
   candidates.forEach((node) => {
     const header = node.querySelector('.header a, .header');
-    const key = header ? cleanText(header.textContent) : node.dataset.date || node.textContent;
+    const key = header ? cleanText(header.textContent) : cleanText(node.dataset?.date || node.textContent);
     if (!key || unique.has(key)) return;
     unique.set(key, node);
   });
@@ -148,11 +152,35 @@ function extractSchedule() {
   const days = collectDayNodes();
   const agenda = [];
 
-  days.forEach((dayElement) => {
-    const fecha = resolveDate(dayElement);
-    const rows = extractRowsFromDay(dayElement, fecha);
-    agenda.push(...rows);
-  });
+  if (days.length) {
+    days.forEach((dayElement) => {
+      const fecha = resolveDate(dayElement);
+      const rows = extractRowsFromDay(dayElement, fecha);
+      agenda.push(...rows);
+    });
+  } else {
+    // Fallback for compact schedules: walk every row that contains a time range
+    const rawRows = document.querySelectorAll('tr, td');
+    rawRows.forEach((row) => {
+      const text = cleanText(row.textContent);
+      if (!/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/.test(text)) return;
+      const { inicio, fin } = extractTimeRange(text);
+      const estado = extractState(text);
+      const codigo = extractCode(text);
+      const lugar = extractLocation(row);
+      const usedPieces = [inicio, fin, estado, `(${codigo})`, lugar].filter(Boolean);
+      const actividad = extractActivity(row, text, usedPieces);
+      agenda.push({
+        fecha: '',
+        hora_inicio: inicio,
+        hora_fin: fin,
+        estado,
+        codigo,
+        actividad,
+        lugar
+      });
+    });
+  }
 
   return agenda;
 }
