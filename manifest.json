@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Exportador de Agenda SENA",
+  "version": "1.0.0",
+  "description": "Extrae tablas de calendario con estructura SENA y las exporta a Excel.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Exportar agenda"
+  },
+  "permissions": ["scripting", "activeTab", "downloads"],
+  "host_permissions": ["<all_urls>"]
+}
