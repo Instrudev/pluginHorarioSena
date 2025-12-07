@@ -1,3 +1,9 @@
+// Desactiva bloqueos comunes de la página (click derecho, inspección, selección, listeners)
+document.oncontextmenu = null;
+document.onkeydown = null;
+document.onselectstart = null;
+window.addEventListener = () => {};
+
 function cleanText(value) {
   return (value || '')
     .replace(/\s+/g, ' ')
@@ -28,6 +34,32 @@ function resolveDate(dayElement) {
   const text = cleanText(dayElement.textContent);
   const match = text.match(/(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{1,2}-\d{1,2}-\d{2,4})/);
   return match ? match[0] : '';
+}
+
+function collectAllWithShadow(root, selector) {
+  const results = new Set();
+  const queue = [root];
+
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current) continue;
+
+    if (current.querySelectorAll) {
+      current.querySelectorAll(selector).forEach((el) => results.add(el));
+    }
+
+    if (current.shadowRoot) {
+      queue.push(current.shadowRoot);
+    }
+
+    if (current.childNodes) {
+      current.childNodes.forEach((child) => {
+        if (child.shadowRoot) queue.push(child.shadowRoot);
+      });
+    }
+  }
+
+  return Array.from(results);
 }
 
 function extractTimeRange(text) {
@@ -97,10 +129,15 @@ function extractRowsFromDay(dayElement, dateText) {
     dayElement.querySelector('.month') ||
     dayElement;
 
-  const rows = Array.from(content.querySelectorAll('tr'));
+  const tables = Array.from(content.querySelectorAll('table'));
+  const rowsFromTables = tables.flatMap((table) => Array.from(table.querySelectorAll('tr')));
+  const directRows = Array.from(content.querySelectorAll('tr'));
+  const rows = rowsFromTables.length ? rowsFromTables : directRows;
   const items = [];
 
-  const containerRows = rows.length ? rows : Array.from(content.querySelectorAll('.row, .fc-event, td'));
+  const containerRows = rows.length
+    ? rows
+    : Array.from(content.querySelectorAll('.row, .fc-event, td, div'));
   const iterable = containerRows.length ? containerRows : [content];
 
   iterable.forEach((row) => {
@@ -133,8 +170,9 @@ function extractRowsFromDay(dayElement, dateText) {
 }
 
 function collectDayNodes() {
-  const candidates = Array.from(
-    document.querySelectorAll('td.day > div.day, td.day, .schedule-compact-outlookxp .day, .day')
+  const candidates = collectAllWithShadow(
+    document,
+    'td.day > div.day, td.day, .schedule-compact-outlookxp .day, .day'
   );
 
   const unique = new Map();
@@ -160,7 +198,7 @@ function extractSchedule() {
     });
   } else {
     // Fallback for compact schedules: walk every row that contains a time range
-    const rawRows = document.querySelectorAll('tr, td');
+    const rawRows = collectAllWithShadow(document, 'tr, td, div');
     rawRows.forEach((row) => {
       const text = cleanText(row.textContent);
       if (!/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/.test(text)) return;

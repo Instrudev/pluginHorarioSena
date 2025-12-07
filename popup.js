@@ -11,6 +11,7 @@ function setStatus(message, isError = false) {
 async function injectExtractor(tabId) {
   await chrome.scripting.executeScript({
     target: { tabId },
+    world: 'MAIN',
     files: ['extractor.js']
   });
 }
@@ -18,6 +19,7 @@ async function injectExtractor(tabId) {
 async function runExtraction(tabId) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId },
+    world: 'MAIN',
     func: () => {
       if (typeof extractSchedule !== 'function') {
         throw new Error('El extractor no se cargó correctamente');
@@ -30,7 +32,7 @@ async function runExtraction(tabId) {
 
 async function handleExtractClick() {
   button.disabled = true;
-  setStatus('Inyectando extractor y leyendo la página actual...');
+  setStatus('Inyectando extractor en el mundo principal y leyendo la página actual...');
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id) {
@@ -42,12 +44,11 @@ async function handleExtractClick() {
 
     if (!agenda.length) {
       setStatus('No se encontraron filas en la agenda.');
-      button.disabled = false;
       return;
     }
 
     setStatus('Generando archivo Excel...');
-    generateExcel(agenda);
+    await generateExcel(agenda);
     setStatus('Archivo "agenda_exportada.xlsx" generado y descargado.');
   } catch (error) {
     console.error(error);
