@@ -5,6 +5,12 @@ function cleanText(value) {
     .trim();
 }
 
+function decodeHtml(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html || '';
+  return cleanText(div.textContent || div.innerText || '');
+}
+
 function resolveDate(dayElement) {
   const attributes = ['data-date', 'data-dia', 'data-fecha'];
   for (const attr of attributes) {
@@ -44,12 +50,25 @@ function extractCode(text) {
   return codeMatch ? codeMatch[1] : '';
 }
 
+function parseTooltip(row) {
+  const onMouse = row.getAttribute('onmouseover') || '';
+  const tooltipMatch = /'content'\s*,\s*'(.*?)'/.exec(onMouse);
+  const captionMatch = /'caption'\s*,\s*'(.*?)'/.exec(onMouse);
+  return {
+    caption: captionMatch ? decodeHtml(captionMatch[1]) : '',
+    content: tooltipMatch ? decodeHtml(tooltipMatch[1]) : ''
+  };
+}
+
 function extractLocation(row) {
   const tooltip = row.querySelector('[data-bs-original-title]');
   if (tooltip) return cleanText(tooltip.getAttribute('data-bs-original-title'));
 
   const titleAttr = row.querySelector('[title]');
   if (titleAttr) return cleanText(titleAttr.getAttribute('title') || titleAttr.textContent);
+
+  const tooltipData = parseTooltip(row);
+  if (tooltipData.content) return tooltipData.content;
 
   const placeNode = row.querySelector('.lugar, .place, .location, .ubicacion');
   if (placeNode) return cleanText(placeNode.textContent);
@@ -59,6 +78,9 @@ function extractLocation(row) {
 function extractActivity(row, text, usedPieces) {
   const activityNode = row.querySelector('.actividad, .activity, .event, .descripcion, .description');
   if (activityNode) return cleanText(activityNode.textContent);
+
+  const tooltipData = parseTooltip(row);
+  if (tooltipData.caption) return tooltipData.caption;
 
   let activityText = text;
   for (const part of usedPieces) {
@@ -70,11 +92,12 @@ function extractActivity(row, text, usedPieces) {
 }
 
 function extractRowsFromDay(dayElement, dateText) {
-  const rows = Array.from(dayElement.querySelectorAll('tr')); // tablas internas
+  const content = dayElement.querySelector('.content') || dayElement;
+  const rows = Array.from(content.querySelectorAll('tr'));
   const items = [];
 
-  const containerRows = rows.length ? rows : Array.from(dayElement.querySelectorAll('.row, .fc-event'));
-  const iterable = containerRows.length ? containerRows : [dayElement];
+  const containerRows = rows.length ? rows : Array.from(content.querySelectorAll('.row, .fc-event, td'));
+  const iterable = containerRows.length ? containerRows : [content];
 
   iterable.forEach((row) => {
     const rawText = cleanText(row.textContent);
@@ -87,6 +110,9 @@ function extractRowsFromDay(dayElement, dateText) {
 
     const usedPieces = [inicio, fin, estado, `(${codigo})`, lugar].filter(Boolean);
     const actividad = extractActivity(row, rawText, usedPieces);
+
+    const hasData = inicio || fin || estado || codigo || actividad || lugar;
+    if (!hasData) return;
 
     items.push({
       fecha: dateText,
@@ -102,8 +128,24 @@ function extractRowsFromDay(dayElement, dateText) {
   return items;
 }
 
+function collectDayNodes() {
+  const candidates = Array.from(
+    document.querySelectorAll('td.day > div.day, .schedule-compact-outlookxp .day, .day')
+  );
+
+  const unique = new Map();
+  candidates.forEach((node) => {
+    const header = node.querySelector('.header a, .header');
+    const key = header ? cleanText(header.textContent) : node.dataset.date || node.textContent;
+    if (!key || unique.has(key)) return;
+    unique.set(key, node);
+  });
+
+  return Array.from(unique.values());
+}
+
 function extractSchedule() {
-  const days = document.querySelectorAll('.day');
+  const days = collectDayNodes();
   const agenda = [];
 
   days.forEach((dayElement) => {
