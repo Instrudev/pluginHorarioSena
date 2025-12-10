@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Exportador Agenda SENA</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 16px;
+      width: 320px;
+    }
+    h1 {
+      font-size: 16px;
+      margin: 0 0 8px 0;
+    }
+    p {
+      font-size: 12px;
+      color: #333;
+      margin: 0 0 12px 0;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #0d6efd;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:disabled {
+      background: #95b9f0;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #555;
+      min-height: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Exportar horarios SENA</h1>
+  <p>Busca las celdas .day de la página actual, extrae la agenda y la descarga como Excel.</p>
+  <button id="extract">Extraer horario y exportar a Excel</button>
+  <div id="status"></div>
+  <script src="excel.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
